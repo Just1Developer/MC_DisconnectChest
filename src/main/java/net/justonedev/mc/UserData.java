@@ -34,9 +34,18 @@ public class UserData {
 		return new Location(Bukkit.getWorlds().get(0), 0, 0, 0);
 	}
 	
+	public static ItemStack EmptyStack;
+	
 	public static final HashMap<String, Inventory> InventoryData = new HashMap<>();
 	private static void Init()
 	{
+		// Set Empty ItemStack
+		EmptyStack = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE, 1);
+		ItemMeta meta = EmptyStack.getItemMeta();
+		if(meta != null) meta.setDisplayName("§f ");
+		EmptyStack.setItemMeta(meta);
+		
+		// Create Folder (probably not necessary)
 		if(folder.exists()) return;
 		folder.mkdirs();
 	}
@@ -120,6 +129,11 @@ public class UserData {
 	public static void EnterInventory(String uuid, Location ChestLocation, PlayerInventory p_inv)
 	{
 		Inventory inv = Bukkit.createInventory(null, invSize, "§8PlayerChest - " + uuid);
+		
+		inv.setItem(0, EmptyStack);
+		inv.setItem(5, EmptyStack);
+		inv.setItem(7, EmptyStack);
+		inv.setItem(8, EmptyStack);
 		
 		inv.setItem(1, p_inv.getHelmet());
 		inv.setItem(2, p_inv.getChestplate());
