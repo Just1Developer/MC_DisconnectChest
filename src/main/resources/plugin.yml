@@ -1,0 +1,7 @@
+name: DisconnectChest
+version: '${project.version}'
+main: net.justonedev.mc.DisconnectChest
+api-version: 1.19
+prefix: JustOneDeveloper's DisconnectChest
+authors: [ JustOneDeveloper ]
+description: DisconnectChest
