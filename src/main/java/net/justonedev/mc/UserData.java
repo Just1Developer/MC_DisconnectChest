@@ -4,11 +4,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,7 +23,8 @@ public class UserData {
 	
 	// These chests only drop the content in the file, not even a chest themselves. Because that would be like. infinite chests.
 	public static final HashMap<Location, String> AllUUIDsByChestLocations = new HashMap<>();
-	public static final HashMap<Location, Material> PreviousBlockTypes = new HashMap<>();
+	
+	public static final HashMap<String, String> AllUUIDsByArmorStandID = new HashMap<>();
 	
 	private static Location ChestLocationByUUID(String uuid)
 	{
@@ -39,13 +40,11 @@ public class UserData {
 	public static final HashMap<String, Inventory> InventoryData = new HashMap<>();
 	private static void Init()
 	{
-		// Set Empty ItemStack
 		EmptyStack = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE, 1);
 		ItemMeta meta = EmptyStack.getItemMeta();
 		if(meta != null) meta.setDisplayName("§f ");
 		EmptyStack.setItemMeta(meta);
 		
-		// Create Folder (probably not necessary)
 		if(folder.exists()) return;
 		folder.mkdirs();
 	}
@@ -63,6 +62,17 @@ public class UserData {
 		 */
 	}
 	
+	public static void RemovePlayerChest(String ArmorStandUUID)
+	{
+		if(!AllUUIDsByArmorStandID.containsKey(ArmorStandUUID)) return;
+		InventoryData.get(AllUUIDsByArmorStandID.get(ArmorStandUUID)).clear();
+		/* Can't do this anymore because of how we're handling inventory wipe on join now
+		if(!AllUUIDsByChestLocations.containsKey(location)) return;
+		InventoryData.remove(AllUUIDsByChestLocations.get(location));
+		AllUUIDsByChestLocations.remove(location);
+		 */
+	}
+	
 	public static Inventory GetInventory(String uuid)
 	{
 		if(InventoryData.containsKey(uuid)) return InventoryData.get(uuid);
@@ -72,26 +82,29 @@ public class UserData {
 	public static void InvokePlayerQuit(Player Player)
 	{
 		Location loc = Player.getLocation();
+		Material Type = Material.AIR;
 		if(loc.getBlock().getType() != Material.AIR)
 		{
 			Location l = new Location(loc.getWorld(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-			PreviousBlockTypes.put(l, l.getBlock().getType());
+			//PreviousBlockTypes.put(l, l.getBlock().getType());
+			// e.g. Water doesnt drop anything
+			if(!l.getBlock().getDrops().isEmpty()) Type = l.getBlock().getType();
 		}
 		
 		// Spawn chest
 		loc.getBlock().setType(Material.CHEST);
 		PlayerInventory p_inv = Player.getInventory();
-		EnterInventory(Player.getUniqueId().toString(), loc, p_inv);
+		EnterInventory(Player.getUniqueId().toString(), loc, p_inv, Type);
 	}
 	
 	public static void InvokePlayerJoined(Player Player)
 	{
 		// Server crashed or sumn
-		if(!UserData.InventoryData.containsKey(Player.getUniqueId().toString())) return;
+		if(!InventoryData.containsKey(Player.getUniqueId().toString())) return;
 		// If the server did not crash, there should be a saved inventory. Only then wipe the old one and load it.
 		Player.getInventory().clear();
 		// Despawn chest
-		Inventory inv = UserData.GetInventory(Player.getUniqueId().toString());
+		Inventory inv = GetInventory(Player.getUniqueId().toString());
 		while(inv.getViewers().size() > 0)
 		{
 			inv.getViewers().get(0).closeInventory();
@@ -116,24 +129,47 @@ public class UserData {
 		// Despawn the Chest
 		Location loc = Player.getLocation();
 		Location l = new Location(loc.getWorld(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-		if(UserData.PreviousBlockTypes.containsKey(l))
+		
+		if(inv.getItem(8) != null && inv.getItem(8).getType() != Material.AIR && !inv.getItem(8).getItemMeta().getDisplayName().equals("§f "))
 		{
-			// If its still a chest, restore the old block. Otherwise, drop it
-			if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(UserData.PreviousBlockTypes.get(l));
-			else if(l.getWorld() != null) l.getWorld().dropItemNaturally(l, new ItemStack(UserData.PreviousBlockTypes.get(l), 1));
-			UserData.PreviousBlockTypes.remove(l);
+			if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(inv.getItem(8).getType());
+			else if(l.getWorld() != null) l.getWorld().dropItemNaturally(l, new ItemStack(inv.getItem(8).getType(), 1));
 		}
 		else if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(Material.AIR);
+		/*
+		if(PreviousBlockTypes.containsKey(l))
+		{
+			// If its still a chest, restore the old block. Otherwise, drop it
+			if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(PreviousBlockTypes.get(l));
+			else if(l.getWorld() != null) l.getWorld().dropItemNaturally(l, new ItemStack(PreviousBlockTypes.get(l), 1));
+			PreviousBlockTypes.remove(l);
+		}
+		else if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(Material.AIR);
+		 */
 	}
 	
-	public static void EnterInventory(String uuid, Location ChestLocation, PlayerInventory p_inv)
+	public static void EnterInventory(String uuid, Location ChestLocation, PlayerInventory p_inv) { EnterInventory(uuid, ChestLocation, p_inv, Material.AIR); }
+	public static void EnterInventory(String uuid, Location ChestLocation, PlayerInventory p_inv, Material PreviousMaterial)
 	{
 		Inventory inv = Bukkit.createInventory(null, invSize, "§8PlayerChest - " + uuid);
+		
+		ItemStack stack = EmptyStack;
+		if(PreviousMaterial != Material.AIR)
+		{
+			stack = new ItemStack(PreviousMaterial, 1);
+			ItemMeta meta = stack.getItemMeta();
+			meta.setDisplayName("§7Previous Item");
+			ArrayList<String> lore = new ArrayList<>();
+			lore.add("§8If left here, will be placed");
+			lore.add("§8back upon the player rejoining.");
+			meta.setLore(lore);
+			stack.setItemMeta(meta);
+		}
 		
 		inv.setItem(0, EmptyStack);
 		inv.setItem(5, EmptyStack);
 		inv.setItem(7, EmptyStack);
-		inv.setItem(8, EmptyStack);
+		inv.setItem(8, stack);
 		
 		inv.setItem(1, p_inv.getHelmet());
 		inv.setItem(2, p_inv.getChestplate());
@@ -182,8 +218,8 @@ public class UserData {
 			Location loc = new Location(Bukkit.getWorld(w), x, y, z);
 			AllUUIDsByChestLocations.put(loc, uuid);
 			
-			String prev = cfg.getString("PreviousType");
-			if(prev != null && !prev.trim().isEmpty() && !prev.equals("AIR")) PreviousBlockTypes.put(loc, Material.getMaterial(prev));
+			//String prev = cfg.getString("PreviousType");
+			//if(prev != null && !prev.trim().isEmpty() && !prev.equals("AIR")) PreviousBlockTypes.put(loc, Material.getMaterial(prev));
 			
 			// remove cfg so it doesnt occupy the file so .delete() deletes it
 			cfg = null;
@@ -221,8 +257,8 @@ public class UserData {
 			}
 			
 			// Set Previous Block
-			if(PreviousBlockTypes.containsKey(ChestLoc))
-				cfg.set("PreviousType", PreviousBlockTypes.get(ChestLoc));
+			//if(PreviousBlockTypes.containsKey(ChestLoc))
+			//	cfg.set("PreviousType", PreviousBlockTypes.get(ChestLoc));
 			
 			// Save file
 			try {

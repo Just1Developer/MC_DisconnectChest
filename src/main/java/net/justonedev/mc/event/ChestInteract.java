@@ -27,16 +27,19 @@ public class ChestInteract implements Listener {
 		World w = e.getBlock().getWorld();
 		for(ItemStack itemStack : UserData.InventoryData.get(UserData.AllUUIDsByChestLocations.get(l)).getContents())
 		{
-			if(itemStack == null || itemStack.getType() == Material.AIR) continue;
-			w.dropItemNaturally(l, itemStack);
+			if(itemStack == null || itemStack.getType() == Material.AIR || itemStack.hasItemMeta()) continue;
+			if(itemStack.getItemMeta().getDisplayName().equals("§7Previous Item") && itemStack.getItemMeta().hasLore() && itemStack.getItemMeta().getLore().size() == 2)
+				w.dropItemNaturally(l, new ItemStack(itemStack.getType(), 1));
+			else w.dropItemNaturally(l, itemStack);
 		}
 		UserData.RemovePlayerChest(l);
-		if(UserData.PreviousBlockTypes.containsKey(l))
-		{
-			l.getBlock().setType(UserData.PreviousBlockTypes.get(l));
-			UserData.PreviousBlockTypes.remove(l);
-		}
-		/* Nope, if we do that, these chests act as bedrock
+		//if(UserData.PreviousBlockTypes.containsKey(l))
+		//{
+		//	l.getBlock().setType(UserData.PreviousBlockTypes.get(l));
+		//	UserData.PreviousBlockTypes.remove(l);
+		//}
+		
+		/* Nope, if we do the following, these chests act as bedrock
 		e.setCancelled(true);
 		e.getPlayer().playSound(e.getPlayer(), Sound.BLOCK_WOOD_BREAK, 5f, 1f);
 		 */

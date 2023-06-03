@@ -1,5 +1,6 @@
 package net.justonedev.mc.event;
 
+import net.justonedev.mc.InteractiveChestEntity;
 import net.justonedev.mc.UserData;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -16,6 +17,7 @@ public class PlayerConnectHandler implements Listener {
 	public void onDisconnect(PlayerQuitEvent e)
 	{
 		UserData.InvokePlayerQuit(e.getPlayer());
+		//InteractiveChestEntity.spawnArmorStand(e.getPlayer().getLocation());
 	}
 	
 	@EventHandler
