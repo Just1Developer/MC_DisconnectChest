@@ -10,6 +10,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.player.PlayerInteractAtEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 
@@ -33,16 +35,6 @@ public class ChestInteract implements Listener {
 			else w.dropItemNaturally(l, itemStack);
 		}
 		UserData.RemovePlayerChest(l);
-		//if(UserData.PreviousBlockTypes.containsKey(l))
-		//{
-		//	l.getBlock().setType(UserData.PreviousBlockTypes.get(l));
-		//	UserData.PreviousBlockTypes.remove(l);
-		//}
-		
-		/* Nope, if we do the following, these chests act as bedrock
-		e.setCancelled(true);
-		e.getPlayer().playSound(e.getPlayer(), Sound.BLOCK_WOOD_BREAK, 5f, 1f);
-		 */
 	}
 	
 	@EventHandler
@@ -74,5 +66,35 @@ public class ChestInteract implements Listener {
 		e.setCancelled(true);
 		e.getPlayer().playSound(e.getPlayer(), Sound.BLOCK_CHEST_OPEN, 5f, 1f);
 		e.getPlayer().openInventory(UserData.InventoryData.get(UserData.AllUUIDsByChestLocations.get(e.getClickedBlock().getLocation())));
+	}
+
+	@EventHandler
+	public void onInteractEntity(PlayerInteractAtEntityEvent e)
+	{
+		if(!UserData.AllUUIDsByArmorStandID.containsKey(e.getRightClicked().getUniqueId().toString())) return;
+		// Clicked Chest Armorstand
+		e.setCancelled(true);
+		e.getPlayer().playSound(e.getPlayer(), Sound.BLOCK_CHEST_OPEN, 5f, 1f);
+		e.getPlayer().openInventory(UserData.InventoryData.get(UserData.AllUUIDsByArmorStandID.get(e.getRightClicked().getUniqueId().toString())));
+	}
+
+	@EventHandler
+	public void onDamage(EntityDamageByEntityEvent e)
+	{
+		String eUUID = e.getEntity().getUniqueId().toString();
+		String uuid = e.getDamager().getUniqueId().toString();
+		if(!UserData.AllUUIDsByArmorStandID.containsKey(eUUID)) return;
+		if(!UserData.AllUUIDsByArmorStandID.get(eUUID).equals(uuid)) return;;
+
+		World w = e.getEntity().getWorld();
+		for(ItemStack itemStack : UserData.InventoryData.get(uuid).getContents())
+		{
+			if(itemStack == null || itemStack.getType() == Material.AIR || itemStack.hasItemMeta()) continue;
+			if(itemStack.getItemMeta().getDisplayName().equals("§7Previous Item") && itemStack.getItemMeta().hasLore() && itemStack.getItemMeta().getLore().size() == 2)
+				w.dropItemNaturally(e.getEntity().getLocation(), new ItemStack(itemStack.getType(), 1));
+			else w.dropItemNaturally(e.getEntity().getLocation(), itemStack);
+		}
+		UserData.RemovePlayerChest(eUUID);
+		e.getEntity().remove();
 	}
 }

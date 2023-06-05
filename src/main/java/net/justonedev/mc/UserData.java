@@ -1,9 +1,12 @@
 package net.justonedev.mc;
 
+import net.justonedev.mc.type.Configuration;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -15,6 +18,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
+import java.util.UUID;
 
 public class UserData {
 	
@@ -33,6 +37,15 @@ public class UserData {
 			if(AllUUIDsByChestLocations.get(key).equals(uuid)) return key;
 		}
 		return new Location(Bukkit.getWorlds().get(0), 0, 0, 0);
+	}
+
+	private static String ArmorStandIDByUUID(String uuid)
+	{
+		for(String key : AllUUIDsByArmorStandID.keySet())
+		{
+			if(AllUUIDsByArmorStandID.get(key).equals(uuid)) return key;
+		}
+		return "";
 	}
 	
 	public static ItemStack EmptyStack;
@@ -86,15 +99,26 @@ public class UserData {
 		if(loc.getBlock().getType() != Material.AIR)
 		{
 			Location l = new Location(loc.getWorld(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+			if(DisconnectChest.CurrentSetting == Configuration.BlockChestEvade)
+			{
+				while(l.getBlockY() <= Player.getWorld().getMaxHeight() && l.getBlock().getType() != Material.AIR)
+					l = new Location(l.getWorld(), l.getBlockX(), l.getBlockY()+1, l.getBlockZ());
+			}
 			//PreviousBlockTypes.put(l, l.getBlock().getType());
 			// e.g. Water doesnt drop anything
 			if(!l.getBlock().getDrops().isEmpty()) Type = l.getBlock().getType();
 		}
 		
 		// Spawn chest
-		loc.getBlock().setType(Material.CHEST);
+		String entityID = "";
+		if(DisconnectChest.CurrentSetting == Configuration.EntityChest)
+		{
+			Type = Material.AIR;	// Entity obv doesnt destroy block
+			//entityID = InteractiveChestEntity.spawnChest(e.getPlayer().getLocation());
+		}
+		else loc.getBlock().setType(Material.CHEST);
 		PlayerInventory p_inv = Player.getInventory();
-		EnterInventory(Player.getUniqueId().toString(), loc, p_inv, Type);
+		EnterInventory(Player.getName(), Player.getUniqueId().toString(), loc, entityID, p_inv, Type);
 	}
 	
 	public static void InvokePlayerJoined(Player Player)
@@ -125,33 +149,37 @@ public class UserData {
 		{
 			Player.getInventory().setItem(i, inv.getItem(i+delta));
 		}
-		
+
 		// Despawn the Chest
 		Location loc = Player.getLocation();
-		Location l = new Location(loc.getWorld(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-		
-		if(inv.getItem(8) != null && inv.getItem(8).getType() != Material.AIR && !inv.getItem(8).getItemMeta().getDisplayName().equals("§f "))
+		if(DisconnectChest.CurrentSetting == Configuration.EntityChest)
 		{
-			if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(inv.getItem(8).getType());
-			else if(l.getWorld() != null) l.getWorld().dropItemNaturally(l, new ItemStack(inv.getItem(8).getType(), 1));
+			for(Entity e : Player.getWorld().getNearbyEntities(loc, 5, 5, 5))
+			{
+				if(!AllUUIDsByArmorStandID.containsKey(e.getUniqueId().toString())) continue;
+				if(!AllUUIDsByArmorStandID.get(e.getUniqueId().toString()).equals(Player.getUniqueId().toString())) continue;
+				// Entity found, despawn
+				e.remove();
+				break;
+			}
 		}
-		else if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(Material.AIR);
-		/*
-		if(PreviousBlockTypes.containsKey(l))
+		else
 		{
-			// If its still a chest, restore the old block. Otherwise, drop it
-			if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(PreviousBlockTypes.get(l));
-			else if(l.getWorld() != null) l.getWorld().dropItemNaturally(l, new ItemStack(PreviousBlockTypes.get(l), 1));
-			PreviousBlockTypes.remove(l);
+			Location l = new Location(loc.getWorld(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+
+			if(inv.getItem(8) != null && inv.getItem(8).getType() != Material.AIR && !inv.getItem(8).getItemMeta().getDisplayName().equals("§f "))
+			{
+				if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(inv.getItem(8).getType());
+				else if(l.getWorld() != null) l.getWorld().dropItemNaturally(l, new ItemStack(inv.getItem(8).getType(), 1));
+			}
+			else if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(Material.AIR);
 		}
-		else if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(Material.AIR);
-		 */
 	}
 	
-	public static void EnterInventory(String uuid, Location ChestLocation, PlayerInventory p_inv) { EnterInventory(uuid, ChestLocation, p_inv, Material.AIR); }
-	public static void EnterInventory(String uuid, Location ChestLocation, PlayerInventory p_inv, Material PreviousMaterial)
+	public static void EnterInventory(String playerName, String uuid, Location ChestLocation, String EntityID, PlayerInventory p_inv) { EnterInventory(playerName, uuid, ChestLocation, EntityID, p_inv, Material.AIR); }
+	public static void EnterInventory(String playerName, String uuid, Location ChestLocation, String EntityID, PlayerInventory p_inv, Material PreviousMaterial)
 	{
-		Inventory inv = Bukkit.createInventory(null, invSize, "§8PlayerChest - " + uuid);
+		Inventory inv = Bukkit.createInventory(null, invSize, "§8PlayerChest - " + playerName);
 		
 		ItemStack stack = EmptyStack;
 		if(PreviousMaterial != Material.AIR)
@@ -187,7 +215,8 @@ public class UserData {
 		}
 		Location ChestLoc = new Location(ChestLocation.getWorld(), ChestLocation.getBlockX(), ChestLocation.getBlockY(), ChestLocation.getBlockZ());
 		InventoryData.put(uuid, inv);
-		AllUUIDsByChestLocations.put(ChestLoc, uuid);
+		if(DisconnectChest.CurrentSetting == Configuration.EntityChest) AllUUIDsByArmorStandID.put(EntityID, uuid);
+		else AllUUIDsByChestLocations.put(ChestLoc, uuid);
 	}
 	
 	public static void Load()
@@ -199,24 +228,34 @@ public class UserData {
 		{
 			String uuid = f.getName().substring(0, f.getName().length()-4);
 			YamlConfiguration cfg = YamlConfiguration.loadConfiguration(f);
-			
-			Inventory inv = Bukkit.createInventory(null, invSize, "§8PlayerChest - " + uuid);
+
+			Player p = Bukkit.getPlayer(UUID.fromString(uuid));
+			Inventory inv = Bukkit.createInventory(null, invSize, "§8PlayerChest - " + (p != null ? p.getName() : uuid));
 			
 			for(int i = 0; i < inv.getSize(); i++) {
 				inv.setItem(i, cfg.getItemStack("invSlot." + i));
 			}
 			
 			InventoryData.put(uuid, inv);
-			
-			String w = "";
-			int x, y, z;
-			w = cfg.getString("ChestLocation.World");
-			if(w == null || w.isEmpty()) w = Bukkit.getWorlds().get(0).getName();
-			x = cfg.getInt("ChestLocation.X");
-			y = cfg.getInt("ChestLocation.Y");
-			z = cfg.getInt("ChestLocation.Z");
-			Location loc = new Location(Bukkit.getWorld(w), x, y, z);
-			AllUUIDsByChestLocations.put(loc, uuid);
+			String SaveType = cfg.getString("SaveType");
+			if(SaveType == null) SaveType = "Block";
+
+			if(SaveType.equals("Block"))
+			{
+				String w = "";
+				int x, y, z;
+				w = cfg.getString("ChestLocation.World");
+				if(w == null || w.isEmpty()) w = Bukkit.getWorlds().get(0).getName();
+				x = cfg.getInt("ChestLocation.X");
+				y = cfg.getInt("ChestLocation.Y");
+				z = cfg.getInt("ChestLocation.Z");
+				Location loc = new Location(Bukkit.getWorld(w), x, y, z);
+				AllUUIDsByChestLocations.put(loc, uuid);
+			}
+			else if(SaveType.equals("Entity"))
+			{
+				AllUUIDsByArmorStandID.put(cfg.getString("EntityUUID"), uuid);
+			}
 			
 			//String prev = cfg.getString("PreviousType");
 			//if(prev != null && !prev.trim().isEmpty() && !prev.equals("AIR")) PreviousBlockTypes.put(loc, Material.getMaterial(prev));
@@ -240,15 +279,25 @@ public class UserData {
 			
 			File f = new File(s_folder + uuid + ".yml");
 			YamlConfiguration cfg = YamlConfiguration.loadConfiguration(f);
-			
-			Location ChestLoc = ChestLocationByUUID(uuid);
-			String s;
-			if(ChestLoc.getWorld() == null) s = Bukkit.getWorlds().get(0).getName();
-			else s = ChestLoc.getWorld().getName();
-			cfg.set("ChestLocation.World", ChestLoc.getWorld().getName());
-			cfg.set("ChestLocation.X", ChestLoc.getBlockX());
-			cfg.set("ChestLocation.Y", ChestLoc.getBlockY());
-			cfg.set("ChestLocation.Z", ChestLoc.getBlockZ());
+
+			if(AllUUIDsByArmorStandID.containsValue(uuid))
+			{
+				cfg.set("SaveType", "Entity");
+				cfg.set("EntityUUID", ArmorStandIDByUUID(uuid));
+			}
+			else
+			{
+				cfg.set("SaveType", "Block");
+				Location ChestLoc = ChestLocationByUUID(uuid);
+				String s;
+				if(ChestLoc.getWorld() == null) s = Bukkit.getWorlds().get(0).getName();
+				else s = ChestLoc.getWorld().getName();
+				cfg.set("ChestLocation.World", ChestLoc.getWorld().getName());
+				cfg.set("ChestLocation.X", ChestLoc.getBlockX());
+				cfg.set("ChestLocation.Y", ChestLoc.getBlockY());
+				cfg.set("ChestLocation.Z", ChestLoc.getBlockZ());
+			}
+
 			
 			// Set items
 			Inventory inv = InventoryData.get(uuid);
