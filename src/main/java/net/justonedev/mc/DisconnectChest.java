@@ -6,15 +6,19 @@ import net.justonedev.mc.event.PlayerConnectHandler;
 import net.justonedev.mc.type.Configuration;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.UUID;
 
 public final class DisconnectChest extends JavaPlugin {
 	
 	public static DisconnectChest Instance;
+	int rotationsched;
 	
 	@Override
 	public void onEnable() {
@@ -27,6 +31,16 @@ public final class DisconnectChest extends JavaPlugin {
 		
 		// Had this in for a lil bit, but i dont think its necessary. The bug came from somewhere else
 		//for(Player p : Bukkit.getOnlinePlayers()) UserData.InvokePlayerJoined(p);
+		rotationsched = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new BukkitRunnable() {
+			@Override
+			public void run() {
+				for(String uuid : UserData.AllUUIDsByArmorStandID.keySet())
+				{
+					ArmorStand as = (ArmorStand) Bukkit.getEntity(UUID.fromString(uuid));
+					//TODO set/update rotation
+				}
+			}
+		}, 1, 1);
 	}
 	
 	@Override

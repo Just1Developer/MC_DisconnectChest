@@ -2,13 +2,19 @@ package net.justonedev.mc;
 
 import net.justonedev.mc.type.Configuration;
 import org.bukkit.Bukkit;
+import org.bukkit.DyeColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.Sign;
+import org.bukkit.block.data.Directional;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -48,15 +54,37 @@ public class UserData {
 		return "";
 	}
 	
-	public static ItemStack EmptyStack;
+	public static ItemStack EmptyStack, HeadFiller, ChestFiller, LegsFiller, FootFiller;
+	public static final String SlotFillerPrefix = "§7Armor Slot - ";
 	
 	public static final HashMap<String, Inventory> InventoryData = new HashMap<>();
+	public static final HashMap<String, BlockDataClass> PrevBlockData = new HashMap<>();
 	private static void Init()
 	{
 		EmptyStack = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE, 1);
 		ItemMeta meta = EmptyStack.getItemMeta();
 		if(meta != null) meta.setDisplayName("§f ");
 		EmptyStack.setItemMeta(meta);
+
+		HeadFiller = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE, 1);
+		meta = HeadFiller.getItemMeta();
+		if(meta != null) meta.setDisplayName(SlotFillerPrefix + "Helmet");
+		HeadFiller.setItemMeta(meta);
+
+		ChestFiller = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE, 1);
+		meta = ChestFiller.getItemMeta();
+		if(meta != null) meta.setDisplayName(SlotFillerPrefix + "Chestplate");
+		ChestFiller.setItemMeta(meta);
+
+		LegsFiller = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE, 1);
+		meta = LegsFiller.getItemMeta();
+		if(meta != null) meta.setDisplayName(SlotFillerPrefix + "Leggings");
+		LegsFiller.setItemMeta(meta);
+
+		FootFiller = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE, 1);
+		meta = FootFiller.getItemMeta();
+		if(meta != null) meta.setDisplayName(SlotFillerPrefix + "Boots");
+		FootFiller.setItemMeta(meta);
 		
 		if(folder.exists()) return;
 		folder.mkdirs();
@@ -108,17 +136,22 @@ public class UserData {
 			// e.g. Water doesnt drop anything
 			if(!l.getBlock().getDrops().isEmpty()) Type = l.getBlock().getType();
 		}
-		
+
 		// Spawn chest
 		String entityID = "";
 		if(DisconnectChest.CurrentSetting == Configuration.EntityChest)
 		{
 			Type = Material.AIR;	// Entity obv doesnt destroy block
-			//entityID = InteractiveChestEntity.spawnChest(e.getPlayer().getLocation());
+			entityID = InteractiveChestEntity.spawnChest(Player);
 		}
-		else loc.getBlock().setType(Material.CHEST);
+
 		PlayerInventory p_inv = Player.getInventory();
 		EnterInventory(Player.getName(), Player.getUniqueId().toString(), loc, entityID, p_inv, Type);
+
+		if(DisconnectChest.CurrentSetting != Configuration.EntityChest)
+		{
+			loc.getBlock().setType(Material.CHEST);
+		}
 	}
 	
 	public static void InvokePlayerJoined(Player Player)
@@ -169,7 +202,48 @@ public class UserData {
 
 			if(inv.getItem(8) != null && inv.getItem(8).getType() != Material.AIR && !inv.getItem(8).getItemMeta().getDisplayName().equals("§f "))
 			{
-				if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(inv.getItem(8).getType());
+				if(l.getBlock().getType() == Material.CHEST)
+				{
+					l.getBlock().setType(inv.getItem(8).getType());
+
+					ArrayList<String> lore = new ArrayList<>();
+					if(inv.getItem(8).getItemMeta().hasLore()) lore.addAll(inv.getItem(8).getItemMeta().getLore());
+
+					for (String s : lore)
+					{
+						if(s.startsWith("§8Sign Text: ")) {
+							if (!(l.getBlock().getState() instanceof Sign)) continue;
+							Sign sign = (Sign) l.getBlock().getState();
+							String[] text = s.substring(13).split("\n");
+							sign.setLine(0, text[0]);
+							sign.setLine(1, text[1]);
+							sign.setLine(2, text[2]);
+							sign.setLine(3, text[3]);
+						}
+						if(s.startsWith("§8SData:"))
+						{
+							if(!(l.getBlock().getState() instanceof Sign)) continue;
+							Sign sign = (Sign) l.getBlock().getState();
+							sign.setGlowingText(s.contains(":gt:"));
+							sign.setEditable(s.contains(":et:"));
+							sign.setColor(DyeColor.valueOf(s.split("color-")[1]));
+						}
+						if(s.startsWith("§8Facing: ")) {
+							if(!(l.getBlock().getBlockData() instanceof Directional)) continue;
+							((Directional) l.getBlock().getBlockData()).setFacing(BlockFace.valueOf(s.substring(10)));
+						}
+					}
+
+					if(l.getBlock().getType().toString().contains("SIGN"))
+					{
+						// Will this work? No idea. But I think somehow something
+						// like this worked in 1.8
+						Sign s = (Sign) l.getBlock().getState();
+						String text = s.getLine(0) + "\n" + s.getLine(1) + "\n" + s.getLine(2) + "\n" + s.getLine(3);
+						lore.add("§8Sign Text: " + text);
+					}
+
+				}
 				else if(l.getWorld() != null) l.getWorld().dropItemNaturally(l, new ItemStack(inv.getItem(8).getType(), 1));
 			}
 			else if(l.getBlock().getType() == Material.CHEST) l.getBlock().setType(Material.AIR);
@@ -184,17 +258,36 @@ public class UserData {
 		ItemStack stack = EmptyStack;
 		if(PreviousMaterial != Material.AIR)
 		{
+			Block block = ChestLocation.getBlock();
 			stack = new ItemStack(PreviousMaterial, 1);
 			ItemMeta meta = stack.getItemMeta();
 			meta.setDisplayName("§7Previous Item");
 			ArrayList<String> lore = new ArrayList<>();
 			lore.add("§8If left here, will be placed");
 			lore.add("§8back upon the player rejoining.");
+			meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+			if(PreviousMaterial.toString().contains("SIGN"))
+			{
+				// Will this work? No idea. But I think somehow something
+				// like this worked in 1.8
+				Sign s = (Sign) block.getState();
+				String text = s.getLine(0) + "\n" + s.getLine(1) + "\n" + s.getLine(2) + "\n" + s.getLine(3);
+				lore.add("§8Sign Text: " + text);
+				lore.add("§8SData:g" + (s.isGlowingText() ? "t" : "f") + ":e" + (s.isEditable() ? "t" : "f") + ":color-" + s.getColor());
+			}
+			if(block.getBlockData() instanceof Directional) {
+				Directional bmeta = (Directional) block.getBlockData();
+				lore.add("§8Facing: " + bmeta.getFacing());
+			}
 			meta.setLore(lore);
 			stack.setItemMeta(meta);
 		}
 		
 		inv.setItem(0, EmptyStack);
+		inv.setItem(1, HeadFiller);
+		inv.setItem(2, ChestFiller);
+		inv.setItem(3, LegsFiller);
+		inv.setItem(4, FootFiller);
 		inv.setItem(5, EmptyStack);
 		inv.setItem(7, EmptyStack);
 		inv.setItem(8, stack);
@@ -317,5 +410,4 @@ public class UserData {
 			}
 		}
 	}
-
 }
