@@ -17,6 +17,8 @@ import java.util.UUID;
 
 public final class DisconnectChest extends JavaPlugin {
 	
+	// Future Plans: Maybe animate block opening with BlockData interfaces
+	
 	public static DisconnectChest Instance;
 	int rotationsched;
 	
@@ -24,6 +26,7 @@ public final class DisconnectChest extends JavaPlugin {
 	public void onEnable() {
 		Instance = this;
 		LoadConfig();
+		System.out.println("Using Configuration " + CurrentSetting);
 		UserData.Load();
 		Bukkit.getPluginManager().registerEvents(new PlayerConnectHandler(), this);
 		Bukkit.getPluginManager().registerEvents(new ChestInteract(), this);
@@ -31,16 +34,15 @@ public final class DisconnectChest extends JavaPlugin {
 		
 		// Had this in for a lil bit, but i dont think its necessary. The bug came from somewhere else
 		//for(Player p : Bukkit.getOnlinePlayers()) UserData.InvokePlayerJoined(p);
-		rotationsched = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new BukkitRunnable() {
-			@Override
-			public void run() {
-				for(String uuid : UserData.AllUUIDsByArmorStandID.keySet())
-				{
-					ArmorStand as = (ArmorStand) Bukkit.getEntity(UUID.fromString(uuid));
-					//TODO set/update rotation
-				}
+		/*
+		rotationsched = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
+			for(String uuid : UserData.AllUUIDsByArmorStandID.keySet())
+			{
+				ArmorStand as = (ArmorStand) Bukkit.getEntity(UUID.fromString(uuid));
+				//TODO set/update rotation
 			}
 		}, 1, 1);
+		*/
 	}
 	
 	@Override

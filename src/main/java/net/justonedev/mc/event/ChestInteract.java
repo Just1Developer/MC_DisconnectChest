@@ -1,10 +1,8 @@
 package net.justonedev.mc.event;
 
 import net.justonedev.mc.UserData;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.Sound;
-import org.bukkit.World;
+import org.bukkit.*;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
@@ -30,7 +28,9 @@ public class ChestInteract implements Listener {
 		for(ItemStack itemStack : UserData.InventoryData.get(UserData.AllUUIDsByChestLocations.get(l)).getContents())
 		{
 			if(itemStack == null || itemStack.getType() == Material.AIR || itemStack.hasItemMeta()) continue;
-			if(itemStack.getItemMeta().getDisplayName().equals("§7Previous Item") && itemStack.getItemMeta().hasLore() && itemStack.getItemMeta().getLore().size() == 2)
+			if(itemStack.getItemMeta().getDisplayName().equals("§7Previous Item") &&
+					itemStack.getItemMeta().getDisplayName().startsWith(UserData.SlotFillerPrefix) &&
+					itemStack.getItemMeta().hasLore() && itemStack.getItemMeta().getLore().size() == 2)
 				w.dropItemNaturally(l, new ItemStack(itemStack.getType(), 1));
 			else w.dropItemNaturally(l, itemStack);
 		}
@@ -61,6 +61,7 @@ public class ChestInteract implements Listener {
 		if(e.getPlayer().isSneaking()) return;
 		Location loc = e.getClickedBlock().getLocation();
 		Location blockLoc = new Location(loc.getWorld(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+		
 		if(!UserData.AllUUIDsByChestLocations.containsKey(blockLoc)) return;
 		
 		e.setCancelled(true);
@@ -82,15 +83,16 @@ public class ChestInteract implements Listener {
 	public void onDamage(EntityDamageByEntityEvent e)
 	{
 		String eUUID = e.getEntity().getUniqueId().toString();
-		String uuid = e.getDamager().getUniqueId().toString();
 		if(!UserData.AllUUIDsByArmorStandID.containsKey(eUUID)) return;
-		if(!UserData.AllUUIDsByArmorStandID.get(eUUID).equals(uuid)) return;;
-
+		
+		String uuid = UserData.AllUUIDsByArmorStandID.get(eUUID);
 		World w = e.getEntity().getWorld();
 		for(ItemStack itemStack : UserData.InventoryData.get(uuid).getContents())
 		{
 			if(itemStack == null || itemStack.getType() == Material.AIR || itemStack.hasItemMeta()) continue;
-			if(itemStack.getItemMeta().getDisplayName().equals("§7Previous Item") && itemStack.getItemMeta().hasLore() && itemStack.getItemMeta().getLore().size() == 2)
+			if(itemStack.getItemMeta().getDisplayName().equals("§7Previous Item") &&
+					itemStack.getItemMeta().getDisplayName().startsWith(UserData.SlotFillerPrefix) && itemStack.getItemMeta().hasLore() &&
+					itemStack.getItemMeta().getLore().size() == 2)
 				w.dropItemNaturally(e.getEntity().getLocation(), new ItemStack(itemStack.getType(), 1));
 			else w.dropItemNaturally(e.getEntity().getLocation(), itemStack);
 		}

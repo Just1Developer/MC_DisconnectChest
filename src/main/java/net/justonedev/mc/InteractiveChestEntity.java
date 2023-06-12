@@ -7,6 +7,7 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.EulerAngle;
 
 public class InteractiveChestEntity {
 
@@ -30,10 +31,14 @@ public class InteractiveChestEntity {
         if(stand.getEquipment() != null) stand.getEquipment().setHelmet(new ItemStack(Material.CHEST));
         stand.setCanPickupItems(false);
         stand.setCollidable(false);
-        stand.setVisibleByDefault(false);
         stand.setPersistent(true);
         stand.setVisualFire(false);
         stand.setInvulnerable(true);
+    
+        EulerAngle angle = new EulerAngle(135, 0, 0);
+        stand.setBodyPose(angle);
+        stand.setLeftLegPose(angle);
+        stand.setRightLegPose(angle);
 
         // inv locks
         for(EquipmentSlot slot : EquipmentSlot.values())
